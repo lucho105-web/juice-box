@@ -184,6 +184,9 @@ def test_middle_found_exactly_once_with_spec_values(offers: pd.DataFrame) -> Non
     assert mid["hold_pct"] == pytest.approx(-4.55, abs=0.005)
     assert mid["miss_net"] == pytest.approx(-4.55, abs=0.005)
     assert mid["hit_net"] == pytest.approx(90.91, abs=0.005)
+    assert mid["best_net"] == pytest.approx(90.91, abs=0.005)
+    assert mid["both_win"]
+    assert pd.isna(mid["push_net"])     # half-point lines can't push
     assert not mid["push_risk"]
 
 
@@ -210,16 +213,77 @@ def test_spread_middle_once_and_reverse_middle_skipped() -> None:
     legs = {(mid["leg1_side"], mid["leg1_point"]), (mid["leg2_side"], mid["leg2_point"])}
     assert legs == {("Home", 3.5), ("Away", -1.5)}
     assert mid["window"] == pytest.approx(2.0)
+    assert mid["both_win"]                       # Away by 2 or 3 wins both
+    assert mid["hit_net"] == pytest.approx(90.91, abs=0.005)
 
 
 def test_whole_number_lines_flag_push_risk() -> None:
+    """O218 / U221: 219 and 220 win both; 218 and 221 push one leg."""
     totals = make_offers("totals", {
         "booka": [("Over", -110, 218.0), ("Under", -110, 218.0)],
         "bookb": [("Over", -110, 221.0), ("Under", -110, 221.0)],
     })
     mids = find_middles(totals)
     assert len(mids) == 1
-    assert mids.iloc[0]["push_risk"]
+    mid = mids.iloc[0]
+    assert mid["push_risk"] and mid["both_win"]
+    assert mid["hit_net"] == pytest.approx(90.91, abs=0.005)
+    assert mid["push_net"] == pytest.approx(45.45, abs=0.005)
+    assert mid["best_net"] == pytest.approx(90.91, abs=0.005)
+
+
+def test_push_only_totals_middle_from_live_data() -> None:
+    """Live case: Over 225 / Under 225.5 at -110 each.
+
+    No whole number is strictly between 225 and 225.5, so both legs can never
+    win. At exactly 225 the Over is refunded ($50) and the Under pays $95.45:
+    net +$45.45, not the +$90.91 the old code claimed.
+    """
+    totals = make_offers("totals", {
+        "booka": [("Over", -110, 225.0), ("Under", -110, 225.0)],
+        "bookb": [("Over", -110, 225.5), ("Under", -110, 225.5)],
+    })
+    mids = find_middles(totals)
+    assert len(mids) == 1
+    mid = mids.iloc[0]
+    assert (mid["leg1_point"], mid["leg2_point"]) == (225.0, 225.5)
+    assert not mid["both_win"]
+    assert pd.isna(mid["hit_net"])
+    assert mid["push_net"] == pytest.approx(45.45, abs=0.005)
+    assert mid["best_net"] == pytest.approx(45.45, abs=0.005)
+    assert mid["miss_net"] == pytest.approx(-4.55, abs=0.005)
+
+
+def test_push_only_spread_middle_from_live_data() -> None:
+    """Live case: Mavericks +5.5 / Timberwolves -5.
+
+    Wolves by exactly 5: Wolves -5 is refunded, Mavs +5.5 wins. No margin
+    wins both, so it is push-only.
+    """
+    spreads = make_offers("spreads", {
+        "booka": [("Mavericks", -110, 5.5), ("Wolves", -110, -5.5)],
+        "bookb": [("Mavericks", -110, 5.0), ("Wolves", -110, -5.0)],
+    })
+    mids = find_middles(spreads)
+    assert len(mids) == 1
+    mid = mids.iloc[0]
+    legs = {(mid["leg1_side"], mid["leg1_point"]), (mid["leg2_side"], mid["leg2_point"])}
+    assert legs == {("Mavericks", 5.5), ("Wolves", -5.0)}
+    assert not mid["both_win"]
+    assert pd.isna(mid["hit_net"])
+    assert mid["push_net"] == pytest.approx(45.45, abs=0.005)
+
+
+def test_window_one_with_two_whole_lines_is_push_only() -> None:
+    """O225 / U226: 225 refunds the Over, 226 refunds the Under, nothing wins both."""
+    totals = make_offers("totals", {
+        "booka": [("Over", -110, 225.0), ("Under", -110, 225.0)],
+        "bookb": [("Over", -110, 226.0), ("Under", -110, 226.0)],
+    })
+    mid = find_middles(totals).iloc[0]
+    assert mid["window"] == pytest.approx(1.0)
+    assert not mid["both_win"]
+    assert mid["best_net"] == pytest.approx(45.45, abs=0.005)
 
 
 # ---------- +EV ----------

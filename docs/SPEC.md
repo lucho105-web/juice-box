@@ -64,6 +64,7 @@ Test: +110 / −105, B=$100 → S=0.98839, profit 1.175%, stakes $48.18 / $51.82
   - `hit_net = 2B/S − B` (both win)
   - Show both in dollars, plus the window width.
 - Flag whole-number lines ("push risk"). Example: Over 218 / Under 221. A result of exactly 218 or 221 pushes one side.
+- **Both legs can only win when a whole-number result fits strictly inside the window** (found in the Phase 5 live test). Over 225 / Under 225.5 has none: 225 refunds the Over and wins the Under. These are **push middles**: `hit_net` does not apply, and the best case is `push_net = B/S + stake_refunded − B` (−110/−110, $100: +$45.45, not +$90.91). Same rule for spreads using team A's margin (low = −a, high = b). Implemented as `odds_math.middle_landings()`; the scanner reports `both_win`, `hit_net` (NaN when impossible), `push_net` and `best_net`, and the UI labels push middles.
 - Test: O218.5 −110 / U221.5 −110, B=$100 → hold −4.55%, miss −$4.55, hit +$90.91.
 - ⚠️ Default min-hold cutoff = **−5.0%** (sidebar setting). The draft's −4.5% cutoff excluded the standard −110/−110 middle.
 

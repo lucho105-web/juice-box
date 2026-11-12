@@ -137,6 +137,52 @@ def test_middle_spec_example() -> None:
     assert mid.stake2 == pytest.approx(50.0)
 
 
+def test_middle_push_nets() -> None:
+    """-110 / -110, $100: payout 95.45 each way, stakes $50 / $50.
+
+    Landing exactly on a whole-number line refunds that leg's $50 and the other
+    leg pays $95.45: 95.45 + 50 - 100 = +$45.45.
+    """
+    d = om.am_to_dec(-110)
+    mid = om.middle(d, d, 100.0)
+    assert mid.push1_net == pytest.approx(45.45, abs=0.005)
+    assert mid.push2_net == pytest.approx(45.45, abs=0.005)
+
+
+def test_middle_push_nets_uneven_prices() -> None:
+    """+110 / -105, $100: payout 101.1751, stakes 48.1786 / 51.8214 (unrounded).
+
+    Leg 1 refunded: 101.1751 + 48.1786 - 100 = +49.3537 -> $49.35.
+    Leg 2 refunded: 101.1751 + 51.8214 - 100 = +52.9965 -> $53.00.
+    (Adding the cent-rounded pieces would give 49.36; round only at the end.)
+    """
+    mid = om.middle(om.am_to_dec(110), om.am_to_dec(-105), 100.0)
+    assert mid.push1_net == pytest.approx(49.35, abs=0.005)
+    assert mid.push2_net == pytest.approx(53.00, abs=0.005)
+
+
+@pytest.mark.parametrize(
+    "low, high, both_win, push_low, push_high",
+    [
+        (218.5, 221.5, True, False, False),   # 219, 220, 221 win both
+        (225.5, 226.5, True, False, False),   # 226 wins both
+        (225.0, 226.5, True, True, False),    # 226 wins both; 225 refunds the Over
+        (218.0, 221.0, True, True, True),     # 219, 220 win both; 218 and 221 push
+        (225.0, 225.5, False, True, False),   # live case: nothing strictly between
+        (213.5, 214.0, False, False, True),   # live case: 214 refunds the Under
+        (225.0, 226.0, False, True, True),    # window 1, both whole: push at each end
+        (-5.5, -5.0, False, False, True),     # spread: Mavs +5.5 / Wolves -5
+        (1.5, 3.5, True, False, False),       # spread: Away -1.5 / Home +3.5 -> Away by 2 or 3
+        (221.5, 221.5, False, False, False),  # same line: an arb candidate, not a middle
+        (221.5, 218.5, False, False, False),  # reverse middle
+    ],
+)
+def test_middle_landings(
+    low: float, high: float, both_win: bool, push_low: bool, push_high: bool
+) -> None:
+    assert om.middle_landings(low, high) == om.MiddleLandings(both_win, push_low, push_high)
+
+
 def test_middle_spec_example_passes_default_cutoff() -> None:
     """The draft's -4.5% cutoff wrongly excluded this; the default is -5.0%."""
     d = om.am_to_dec(-110)

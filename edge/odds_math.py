@@ -142,15 +142,18 @@ def equalizing_stake(stake1: float, d1: float, d2: float) -> float:
 @dataclass(frozen=True)
 class MiddleResult:
     s: float
-    hold_pct: float   # (1/S - 1) * 100; usually a small negative number
+    hold_pct: float    # (1/S - 1) * 100; usually a small negative number
     stake1: float
     stake2: float
-    miss_net: float   # one side wins: B/S - B
-    hit_net: float    # both sides win: 2B/S - B
+    miss_net: float    # one side wins: B/S - B
+    hit_net: float     # both sides win: 2B/S - B
+    push1_net: float   # leg 1 refunded, leg 2 wins: B/S + stake1 - B
+    push2_net: float   # leg 2 refunded, leg 1 wins: B/S + stake2 - B
 
 
 def middle(d1: float, d2: float, bankroll: float) -> MiddleResult:
-    """Equal-payout staking for a middle. Says nothing about the window."""
+    """Equal-payout staking for a middle. Says nothing about the window;
+    use middle_landings() to know which of these nets can actually happen."""
     arb = arb_two_way(d1, d2, bankroll)
     return MiddleResult(
         s=arb.s,
@@ -159,6 +162,36 @@ def middle(d1: float, d2: float, bankroll: float) -> MiddleResult:
         stake2=arb.stake2,
         miss_net=arb.payout - bankroll,
         hit_net=2.0 * arb.payout - bankroll,
+        push1_net=arb.payout + arb.stake1 - bankroll,
+        push2_net=arb.payout + arb.stake2 - bankroll,
+    )
+
+
+@dataclass(frozen=True)
+class MiddleLandings:
+    both_win: bool     # some whole-number result wins both legs
+    push_low: bool     # a result exactly on the low line refunds leg 1, leg 2 wins
+    push_high: bool    # a result exactly on the high line refunds leg 2, leg 1 wins
+
+
+def middle_landings(low: float, high: float) -> MiddleLandings:
+    """Which middle outcomes are possible when scores are whole numbers.
+
+    Leg 1 wins when the result is above `low` (pushes when equal); leg 2 wins
+    when it is below `high` (pushes when equal).
+    - Totals: low = Over point, high = Under point; the result is the total.
+    - Spreads: team A at a, team B at b -> low = -a, high = b; the result is
+      team A's winning margin.
+    Example: Over 225 / Under 225.5 has no whole number strictly between, so
+    both legs can never win together; 225 refunds the Over and wins the Under.
+    """
+    if high <= low:
+        return MiddleLandings(False, False, False)
+    first_above_low = math.floor(low) + 1
+    return MiddleLandings(
+        both_win=first_above_low < high,
+        push_low=float(low).is_integer(),
+        push_high=float(high).is_integer(),
     )
 
 

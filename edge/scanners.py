@@ -30,8 +30,8 @@ ARB_COLUMNS = BASE_COLUMNS + LEG_COLUMNS + [
     "r_stake1", "r_stake2", "worst_net", "best_net", "goes_negative",
 ]
 MIDDLE_COLUMNS = BASE_COLUMNS + LEG_COLUMNS + [
-    "max_age_s", "window", "push_risk", "s", "hold_pct", "stake1", "stake2",
-    "miss_net", "hit_net",
+    "max_age_s", "window", "push_risk", "both_win", "s", "hold_pct", "stake1", "stake2",
+    "miss_net", "hit_net", "push_net", "best_net",
 ]
 EV_COLUMNS = BASE_COLUMNS + list(LEG_FIELDS) + [
     "fair_prob", "fair_odds_am", "ev_pct", "n_books", "reference", "kelly_stake",
@@ -158,13 +158,36 @@ def find_arbs(
 
 # ---------- middles ----------
 
+def _middle_bounds(market: str, a: Row, b: Row) -> tuple[float, float]:
+    """(low, high) for odds_math.middle_landings: totals use the Over / Under
+    points; spreads use team A's winning margin, so low = -a and high = b."""
+    pa, pb = _point(a), _point(b)
+    return (pa, pb) if market == "totals" else (-pa, pb)
+
+
+def _push_net(mid: om.MiddleResult, landings: om.MiddleLandings) -> float:
+    """Best net when the result lands exactly on a whole-number line."""
+    nets = [
+        net
+        for net, possible in ((mid.push1_net, landings.push_low), (mid.push2_net, landings.push_high))
+        if possible
+    ]
+    return max(nets) if nets else math.nan
+
+
 def find_middles(
     df: pd.DataFrame,
     bankroll: float = 100.0,
     min_hold_pct: float = om.DEFAULT_MIN_MIDDLE_HOLD_PCT,
     min_window: float = 0.5,
 ) -> pd.DataFrame:
-    """Middles on spreads (a + b > 0) and totals (Under point > Over point)."""
+    """Middles on spreads (a + b > 0) and totals (Under point > Over point).
+
+    `both_win` is False for push-only middles (e.g. Over 225 / Under 225.5):
+    no whole-number result wins both legs, so `hit_net` is NaN and the best
+    case is `push_net` (one leg refunded, the other wins). `best_net` is
+    whichever of the two can actually happen.
+    """
     out: list[Row] = []
     for market, rows in _groups(df):
         for a, b, window in _pairs(market, _best_sides(rows)):
@@ -173,16 +196,22 @@ def find_middles(
             mid = om.middle(a["price_dec"], b["price_dec"], bankroll)
             if mid.hold_pct < min_hold_pct:
                 continue
+            landings = om.middle_landings(*_middle_bounds(market, a, b))
+            hit_net = mid.hit_net if landings.both_win else math.nan
+            push_net = _push_net(mid, landings)
             out.append({
                 **_two_leg_row(a, b),
                 "window": window,
                 "push_risk": om.has_push_risk(_point(a), _point(b)),
+                "both_win": landings.both_win,
                 "s": mid.s,
                 "hold_pct": mid.hold_pct,
                 "stake1": mid.stake1,
                 "stake2": mid.stake2,
                 "miss_net": mid.miss_net,
-                "hit_net": mid.hit_net,
+                "hit_net": hit_net,
+                "push_net": push_net,
+                "best_net": hit_net if landings.both_win else push_net,
             })
     return _frame(out, MIDDLE_COLUMNS, "hold_pct")
 

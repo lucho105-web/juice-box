@@ -207,7 +207,9 @@ def headline(kind: str, row: pd.Series) -> str:
     if kind == "arb":
         return pill(f"Arb {fmt.pct(row['profit_pct'])}")
     if kind == "middle":
-        return pill(f"Middle {row['window']:g} pts")
+        if row["both_win"]:
+            return pill(f"Middle {row['window']:g} pts")
+        return pill(f"Push middle {row['window']:g} pts", positive=False)
     return pill(f"+EV {fmt.pct(row['ev_pct'], 1, signed=False)}")
 
 
@@ -226,7 +228,8 @@ def summary_line(kind: str, row: pd.Series) -> str:
     if kind == "arb":
         return f"{fmt.money(bankroll)} → {fmt.money(row['payout'])} (net {fmt.money(row['net'], signed=True)})"
     if kind == "middle":
-        return f"Miss {fmt.money(row['miss_net'], signed=True)} · Hit {fmt.money(row['hit_net'], signed=True)}"
+        best = "Hit" if row["both_win"] else "Push"
+        return f"Miss {fmt.money(row['miss_net'], signed=True)} · {best} {fmt.money(row['best_net'], signed=True)}"
     return f"Fair price {fmt.american(row['fair_odds_am'])} from {int(row['n_books'])} book{'s' if row['n_books'] != 1 else ''}"
 
 
@@ -387,10 +390,11 @@ def table_view(kind: str, table: pd.DataFrame) -> pd.DataFrame:
         out["Profit %"] = table["profit_pct"].round(2)
         out["Net $"] = table["net"].round(2)
     else:
+        out["Type"] = table["both_win"].map({True: "Middle", False: "Push only"})
         out["Window"] = table["window"]
         out["Hold %"] = table["hold_pct"].round(2)
         out["Miss $"] = table["miss_net"].round(2)
-        out["Hit $"] = table["hit_net"].round(2)
+        out["Best $"] = table["best_net"].round(2)
     out["Age s"] = table["max_age_s"].round(0)
     return out
 
@@ -443,13 +447,23 @@ def screen_detail() -> None:
     elif kind == "middle":
         leg_card("Leg 1", row, "leg1_", row["stake1"])
         leg_card("Leg 2", row, "leg2_", row["stake2"])
-        st.info(
-            f"Window {row['window']:g} points. If it lands in the middle both bets win: "
-            f"{fmt.money(row['hit_net'], signed=True)}. Otherwise: {fmt.money(row['miss_net'], signed=True)} "
-            f"(hold {fmt.pct(row['hold_pct'])})."
-        )
-        if row["push_risk"]:
-            st.warning("Push risk: one of these is a whole-number line, so an exact landing pushes one side.")
+        miss = f"{fmt.money(row['miss_net'], signed=True)} (hold {fmt.pct(row['hold_pct'])})"
+        if row["both_win"]:
+            st.info(
+                f"Window {row['window']:g} points. If it lands in the middle both bets win: "
+                f"{fmt.money(row['hit_net'], signed=True)}. Otherwise: {miss}."
+            )
+            if row["push_risk"]:
+                st.caption(
+                    f"One line is a whole number. Landing exactly on it refunds that bet "
+                    f"and the other wins: {fmt.money(row['push_net'], signed=True)}."
+                )
+        else:
+            st.warning(
+                f"Push middle: no final score wins both bets. The best case is landing exactly "
+                f"on the whole-number line, which refunds one bet while the other wins: "
+                f"{fmt.money(row['push_net'], signed=True)}. Otherwise: {miss}."
+            )
     else:
         leg_card("Bet", row, "", row["kelly_stake"] if pd.notna(row["kelly_stake"]) else None)
         ref = "Pinnacle's no-vig price" if row["reference"] == "pinnacle" else f"the median no-vig price of {int(row['n_books'])} other books"
