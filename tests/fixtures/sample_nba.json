@@ -1,0 +1,284 @@
+[
+  {
+    "id": "evt_arb_h2h_0001",
+    "sport_key": "basketball_nba",
+    "sport_title": "NBA",
+    "commence_time": "2026-11-13T00:30:00Z",
+    "home_team": "New York Knicks",
+    "away_team": "Boston Celtics",
+    "bookmakers": [
+      {
+        "key": "draftkings",
+        "title": "DraftKings",
+        "last_update": "2026-11-12T22:59:26Z",
+        "link": "https://sportsbook.draftkings.com/event/bos-celtics-%40-ny-knicks/30001",
+        "sid": "30001",
+        "markets": [
+          {
+            "key": "h2h",
+            "last_update": "2026-11-12T22:59:26Z",
+            "link": null,
+            "sid": null,
+            "outcomes": [
+              {"name": "Boston Celtics", "price": 110, "link": null, "sid": null},
+              {"name": "New York Knicks", "price": -130, "link": null, "sid": null}
+            ]
+          }
+        ]
+      },
+      {
+        "key": "fanduel",
+        "title": "FanDuel",
+        "last_update": "2026-11-12T22:59:40Z",
+        "link": "https://sportsbook.fanduel.com/basketball/nba/boston-celtics-@-new-york-knicks-40001",
+        "sid": "40001",
+        "markets": [
+          {
+            "key": "h2h",
+            "last_update": "2026-11-12T22:59:40Z",
+            "link": "https://sportsbook.fanduel.com/basketball/nba/boston-celtics-@-new-york-knicks-40001?tab=moneyline",
+            "sid": "42.5001",
+            "outcomes": [
+              {
+                "name": "Boston Celtics",
+                "price": -115,
+                "link": "https://sportsbook.fanduel.com/addToBetslip?marketId=42.5001&selectionId=7001",
+                "sid": "7001"
+              },
+              {
+                "name": "New York Knicks",
+                "price": -105,
+                "link": "https://sportsbook.fanduel.com/addToBetslip?marketId=42.5001&selectionId=7002",
+                "sid": "7002"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "key": "betmgm",
+        "title": "BetMGM",
+        "last_update": "2026-11-12T22:40:00Z",
+        "link": null,
+        "sid": null,
+        "markets": [
+          {
+            "key": "h2h",
+            "last_update": "2026-11-12T22:40:00Z",
+            "link": null,
+            "sid": null,
+            "outcomes": [
+              {"name": "Boston Celtics", "price": -170, "link": null, "sid": null},
+              {"name": "New York Knicks", "price": 150, "link": null, "sid": null}
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "evt_arb_spread_0002",
+    "sport_key": "basketball_nba",
+    "sport_title": "NBA",
+    "commence_time": "2026-11-13T01:00:00Z",
+    "home_team": "Chicago Bulls",
+    "away_team": "Miami Heat",
+    "bookmakers": [
+      {
+        "key": "draftkings",
+        "title": "DraftKings",
+        "last_update": "2026-11-12T22:59:10Z",
+        "markets": [
+          {
+            "key": "spreads",
+            "last_update": "2026-11-12T22:59:10Z",
+            "outcomes": [
+              {"name": "Miami Heat", "price": 105, "point": -2.5},
+              {"name": "Chicago Bulls", "price": -125, "point": 2.5}
+            ]
+          }
+        ]
+      },
+      {
+        "key": "fanduel",
+        "title": "FanDuel",
+        "last_update": "2026-11-12T22:59:30Z",
+        "markets": [
+          {
+            "key": "spreads",
+            "last_update": "2026-11-12T22:59:30Z",
+            "outcomes": [
+              {"name": "Miami Heat", "price": -125, "point": -2.5},
+              {"name": "Chicago Bulls", "price": 102, "point": 2.5}
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "evt_middle_total_0003",
+    "sport_key": "basketball_nba",
+    "sport_title": "NBA",
+    "commence_time": "2026-11-13T01:30:00Z",
+    "home_team": "Dallas Mavericks",
+    "away_team": "Houston Rockets",
+    "bookmakers": [
+      {
+        "key": "draftkings",
+        "title": "DraftKings",
+        "last_update": "2026-11-12T22:59:48Z",
+        "markets": [
+          {
+            "key": "totals",
+            "last_update": "2026-11-12T22:59:48Z",
+            "outcomes": [
+              {"name": "Over", "price": -110, "point": 218.5},
+              {"name": "Under", "price": -110, "point": 218.5}
+            ]
+          }
+        ]
+      },
+      {
+        "key": "fanduel",
+        "title": "FanDuel",
+        "last_update": "2026-11-12T22:59:35Z",
+        "markets": [
+          {
+            "key": "totals",
+            "last_update": "2026-11-12T22:59:35Z",
+            "outcomes": [
+              {"name": "Over", "price": -110, "point": 221.5},
+              {"name": "Under", "price": -110, "point": 221.5}
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "evt_ev_h2h_0004",
+    "sport_key": "basketball_nba",
+    "sport_title": "NBA",
+    "commence_time": "2026-11-13T03:00:00Z",
+    "home_team": "Denver Nuggets",
+    "away_team": "Los Angeles Lakers",
+    "bookmakers": [
+      {
+        "key": "draftkings",
+        "title": "DraftKings",
+        "last_update": "2026-11-12T23:00:00Z",
+        "markets": [
+          {
+            "key": "h2h",
+            "last_update": "2026-11-12T23:00:00Z",
+            "outcomes": [
+              {"name": "Los Angeles Lakers", "price": -110},
+              {"name": "Denver Nuggets", "price": -110}
+            ]
+          }
+        ]
+      },
+      {
+        "key": "fanduel",
+        "title": "FanDuel",
+        "last_update": "2026-11-12T22:59:52Z",
+        "markets": [
+          {
+            "key": "h2h",
+            "last_update": "2026-11-12T22:59:52Z",
+            "outcomes": [
+              {"name": "Los Angeles Lakers", "price": -110},
+              {"name": "Denver Nuggets", "price": -110}
+            ]
+          }
+        ]
+      },
+      {
+        "key": "williamhill_us",
+        "title": "Caesars",
+        "last_update": "2026-11-12T22:59:20Z",
+        "markets": [
+          {
+            "key": "h2h",
+            "last_update": "2026-11-12T22:59:20Z",
+            "outcomes": [
+              {"name": "Los Angeles Lakers", "price": -110},
+              {"name": "Denver Nuggets", "price": -110}
+            ]
+          }
+        ]
+      },
+      {
+        "key": "espnbet",
+        "title": "ESPN BET",
+        "last_update": "2026-11-12T22:59:05Z",
+        "markets": [
+          {
+            "key": "h2h",
+            "last_update": "2026-11-12T22:59:05Z",
+            "outcomes": [
+              {"name": "Los Angeles Lakers", "price": -110},
+              {"name": "Denver Nuggets", "price": -110}
+            ]
+          }
+        ]
+      },
+      {
+        "key": "betmgm",
+        "title": "BetMGM",
+        "last_update": "2026-11-12T22:59:45Z",
+        "markets": [
+          {
+            "key": "h2h",
+            "last_update": "2026-11-12T22:59:45Z",
+            "outcomes": [
+              {"name": "Los Angeles Lakers", "price": 108},
+              {"name": "Denver Nuggets", "price": -128}
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "evt_live_h2h_0005",
+    "sport_key": "basketball_nba",
+    "sport_title": "NBA",
+    "commence_time": "2026-11-12T22:30:00Z",
+    "home_team": "Golden State Warriors",
+    "away_team": "Phoenix Suns",
+    "bookmakers": [
+      {
+        "key": "draftkings",
+        "title": "DraftKings",
+        "last_update": "2026-11-12T22:59:55Z",
+        "markets": [
+          {
+            "key": "h2h",
+            "last_update": "2026-11-12T22:59:55Z",
+            "outcomes": [
+              {"name": "Phoenix Suns", "price": 120},
+              {"name": "Golden State Warriors", "price": -140}
+            ]
+          }
+        ]
+      },
+      {
+        "key": "fanduel",
+        "title": "FanDuel",
+        "last_update": "2026-11-12T22:59:50Z",
+        "markets": [
+          {
+            "key": "h2h",
+            "last_update": "2026-11-12T22:59:50Z",
+            "outcomes": [
+              {"name": "Phoenix Suns", "price": -125},
+              {"name": "Golden State Warriors", "price": 105}
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]
