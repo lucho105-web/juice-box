@@ -1,0 +1,7 @@
+.env
+venv/
+__pycache__/
+.cache/
+.pytest_cache/
+.streamlit/secrets.toml
+juice_box_starter.zip

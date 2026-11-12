@@ -1,0 +1,8 @@
+# Juice Box "Graphite" theme (see docs/SPEC.md section 4e)
+[theme]
+base = "dark"
+primaryColor = "#FF8A1F"
+backgroundColor = "#111113"
+secondaryBackgroundColor = "#1C1C1F"
+textColor = "#F4F4F5"
+borderColor = "#2C2C31"
