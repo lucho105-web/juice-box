@@ -6,3 +6,6 @@ backgroundColor = "#111113"
 secondaryBackgroundColor = "#1C1C1F"
 textColor = "#F4F4F5"
 borderColor = "#2C2C31"
+
+[browser]
+gatherUsageStats = false
