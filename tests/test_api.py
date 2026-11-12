@@ -129,6 +129,17 @@ def test_fetch_odds_cache_hit_spends_nothing() -> None:
     assert second.fetched_at == first.fetched_at  # ages stay honest on cached data
 
 
+def test_fetch_odds_can_skip_the_cache() -> None:
+    """The pre-bet re-check must see fresh prices even within the TTL."""
+    clock = Clock()
+    client, session = make_client(FakeResponse(headers=QUOTA_HEADERS), clock)
+    client.fetch_odds("basketball_nba", ["us"], ["h2h"], event_ids=["e1"])
+    clock.t += 10
+    again = client.fetch_odds("basketball_nba", ["us"], ["h2h"], event_ids=["e1"], use_cache=False)
+    assert again.source == "live"
+    assert len(session.calls) == 2
+
+
 def test_fetch_odds_cache_expires_after_ttl() -> None:
     clock = Clock()
     client, session = make_client(FakeResponse(headers=QUOTA_HEADERS), clock)

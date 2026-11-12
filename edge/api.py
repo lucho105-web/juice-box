@@ -198,8 +198,10 @@ class OddsClient:
         markets: Sequence[str] = DEFAULT_MARKETS,
         event_ids: Sequence[str] | None = None,
         include_links: bool = True,
+        use_cache: bool = True,
     ) -> OddsResponse:
-        """Odds for one sport. Served from cache when younger than the TTL."""
+        """Odds for one sport. Served from cache when younger than the TTL,
+        unless use_cache is False (the pre-bet price re-check)."""
         key: CacheKey = (
             sport,
             tuple(sorted(set(regions))),
@@ -208,7 +210,7 @@ class OddsClient:
             include_links,
         )
         now = self._clock()
-        cached = self._cache.get(key)
+        cached = self._cache.get(key) if use_cache else None
         if cached and now - cached[0] < self._cache_ttl_s:
             hit = cached[1]
             return OddsResponse(hit.events, hit.quota, "cache", 0, hit.fetched_at)

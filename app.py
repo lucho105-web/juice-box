@@ -6,18 +6,26 @@ drill-in screens, phone first, Graphite theme.
 from __future__ import annotations
 
 import html
+import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
+from dotenv import load_dotenv
 
-from edge import api, fmt, odds_math as om, service
+from edge import api, fmt, links, odds_math as om, service
+from edge.parse import filter_offers, parse_odds
 
+load_dotenv()
 ROOT = Path(__file__).parent
 ASSETS = ROOT / "assets"
 SCAN_LOG = ROOT / ".cache" / "scan_log.csv"
+BET_LOG = ROOT / ".cache" / "bets.csv"
+RECHECK_MAX_AGE_S = 120
 
 KIND_LABEL = {"arb": "Arbs", "middle": "Middles", "ev": "+EV"}
 REGIONS = ["us", "us2", "eu", "uk", "au"]
@@ -57,7 +65,8 @@ CSS = """
 .jb-strong {font-weight: 600;}
 .jb-leg {background: #111113; border-radius: 8px; padding: 6px 10px; margin-top: 6px;}
 .jb-big {font-size: 1.5rem; font-weight: 600;}
-button[data-testid="stBaseButton-primary"] {color: #2A1400; font-weight: 600;}
+button[data-testid="stBaseButton-primary"], a[data-testid="stBaseLinkButton-primary"],
+a[data-testid="stBaseLinkButton-primary"] p {color: #2A1400 !important; font-weight: 600;}
 div[class*="st-key-tile_"] button {height: 4.6rem;}
 div[class*="st-key-tile_"] button p {font-size: 1rem; line-height: 1.3;}
 div[class*="st-key-tile_"] button strong {font-size: 1.5rem; display: block;}
@@ -399,16 +408,84 @@ def table_view(kind: str, table: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def leg_card(title: str, row: pd.Series, prefix: str, stake: float | None) -> None:
-    label = fmt.leg_label(row[f"{prefix}side"], row[f"{prefix}point"], row["market"])
-    with st.container(border=True):
-        st.markdown(
-            row_html(f'<span class="jb-strong">{esc(title)} · {esc(row[f"{prefix}book"])}</span>',
-                     f"{fmt.age(row[f'{prefix}age_s'])} old")
-            + f"<div>{esc(label)} <span class='jb-strong'>{fmt.american(row[f'{prefix}price_am'])}</span></div>"
-            + (f'<div class="jb-big">Stake {fmt.money(stake)}</div>' if stake is not None else ""),
-            unsafe_allow_html=True,
-        )
+def bet_state() -> str:
+    return os.environ.get("BET_STATE", "nc").strip().lower()
+
+
+def copy_button(amount: float) -> None:
+    """Copies the stake (a bare number, e.g. 48 or 51.63) to the clipboard."""
+    text = f"{amount:.2f}".removesuffix(".00")
+    label = fmt.money(amount)
+    components.html(
+        f"""<body style="margin:0">
+<button id="b" style="width:100%;height:40px;border-radius:8px;border:1px solid #2C2C31;
+ background:#1C1C1F;color:#F4F4F5;font:600 15px 'Source Sans Pro',sans-serif;cursor:pointer">Copy {label}</button>
+<script>
+const b = document.getElementById('b');
+b.onclick = async () => {{
+  const t = {json.dumps(text)}; let ok = false;
+  try {{ await navigator.clipboard.writeText(t); ok = true; }} catch (e) {{
+    const a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select();
+    try {{ ok = document.execCommand('copy'); }} catch (e2) {{}} a.remove();
+  }}
+  b.textContent = ok ? 'Copied {label}' : 'Copy failed. Stake is ' + t;
+}};
+</script></body>""",
+        height=44,
+    )
+
+
+def do_recheck(kind: str, key: str, row: pd.Series) -> None:
+    """Fresh prices for this one event and market. 1 credit per region live."""
+    c = cfg()
+    st.session_state.pop(f"rc_err_{key}", None)
+    try:
+        if c["use_fixtures"]:
+            resp = api.fixture_response()
+        else:
+            api_key = _api_key()
+            if not api_key:
+                raise api.OddsApiError("No API key found. Add ODDS_API_KEY to your .env file.")
+            resp = _client(api_key).fetch_odds(
+                c["sport"], c["regions"], [row["market"]], event_ids=[row["event_id"]], use_cache=False
+            )
+    except api.OddsApiError as exc:
+        st.session_state[f"rc_err_{key}"] = exc.message
+        return
+    result = service.recheck(kind, row, resp.events, now_for(resp), settings())
+    st.session_state[f"rc_{key}"] = (result, datetime.now(timezone.utc), resp.credits_spent)
+
+
+def recheck_banner(kind: str, key: str, row: pd.Series) -> service.Recheck | None:
+    """Shows the re-check state; returns the result while it's fresh and still good."""
+    cost = 0 if cfg()["use_fixtures"] else service.recheck_cost(cfg()["regions"])
+    cost_txt = f"{cost} credit{'' if cost == 1 else 's'}"
+    if err := st.session_state.get(f"rc_err_{key}"):
+        st.error(err)
+    saved = st.session_state.get(f"rc_{key}")
+    age_s = (datetime.now(timezone.utc) - saved[1]).total_seconds() if saved else None
+    if saved is None or age_s > RECHECK_MAX_AGE_S:
+        if saved is not None:
+            st.caption(f"Last re-check was {fmt.age(age_s)} ago. Check again before you bet.")
+        st.info("Re-check both prices before you bet. Lines move fast.")
+        st.button(f"Re-check prices · {cost_txt}", key=f"rc_btn_{key}", type="primary",
+                  width="stretch", on_click=do_recheck, args=(kind, key, row))
+        return None
+    result: service.Recheck = saved[0]
+    metric_name = {"arb": "profit", "middle": "hold", "ev": "EV"}[kind]
+    when = f"re-checked {fmt.age(age_s)} ago"
+    if result.status == "gone":
+        st.error(f"Line gone: a book pulled or changed this line ({when}). Don't bet it.")
+    elif not result.still_good:
+        gone = "ARB GONE" if kind == "arb" else "No longer worth it"
+        st.error(f"{gone}: {metric_name} is now {fmt.pct(result.metric)} ({when}).")
+    elif result.status == "moved":
+        st.warning(f"Price moved, still good: {metric_name} now {fmt.pct(result.metric)} ({when}). Stakes updated.")
+    else:
+        st.success(f"Prices {when}: unchanged, still good.")
+    st.button(f"Re-check again · {cost_txt}", key=f"rc_again_{key}", width="stretch",
+              on_click=do_recheck, args=(kind, key, row))
+    return result if result.status != "gone" and result.still_good else None
 
 
 def screen_detail() -> None:
@@ -418,9 +495,11 @@ def screen_detail() -> None:
         back("Home", "home")
     else:
         back(KIND_LABEL[kind], "list", kind=kind)
+    resp: api.OddsResponse | None = st.session_state.get("scan")
     results = current_results()
-    row = service.find_by_key(results, kind, st.session_state.get("opp_key", "")) if results else None
-    if row is None:
+    key = st.session_state.get("opp_key", "")
+    row = service.find_by_key(results, kind, key) if results else None
+    if row is None or resp is None:
         st.warning("This one is gone. The lines moved or went stale. Scan again for fresh prices.")
         return
     st.markdown(
@@ -430,23 +509,72 @@ def screen_detail() -> None:
         unsafe_allow_html=True,
     )
     s = settings()
+    checked = recheck_banner(kind, key, row)
+    prefixes = service.leg_prefixes(kind)
+    prices = list(checked.prices) if checked else [int(row[f"{p}price_am"]) for p in prefixes]
+    fair = float(row["fair_prob"]) if kind == "ev" else None
+    stakes = dict(zip(prefixes, service.leg_stakes(kind, prices, s, fair)))
+    price_of = dict(zip(prefixes, prices))
+    offers = filter_offers(parse_odds(resp.events, now_for(resp)), s.max_age_s, s.include_live)
+    order = service.leg_order(kind, row, offers)
+
+    placed: list[service.PlacedLeg] = []
+    first_got: int | None = None
+    for i, prefix in enumerate(order):
+        stake = stakes[prefix]
+        price = price_of[prefix]
+        if i == 1 and first_got is not None and first_got != price_of[order[0]]:
+            stake = om.round_to_step(service.rebalanced_stake(stakes[order[0]], first_got, price), s.stake_step)
+        title = "Bet" if kind == "ev" else f"Leg {i + 1}"
+        is_placed = st.session_state.get(f"placed_{key}_{prefix}", False)
+        nudge = i == 1 and placed and not is_placed
+        bet = fmt.leg_label(row[f"{prefix}side"], row[f"{prefix}point"], row["market"])
+        link = links.pick_link(row, prefix, bet_state())
+        with st.container(border=True):
+            st.markdown(
+                row_html(f'<span class="jb-strong">{esc(title)} · {esc(row[f"{prefix}book"])}</span>',
+                         pill("Place now") if nudge else esc(link.level if link else "No link"))
+                + f"<div>{esc(bet)} <span class='jb-strong'>{fmt.american(price)}</span></div>"
+                + f'<div class="jb-big">Stake {fmt.money(stake)}</div>',
+                unsafe_allow_html=True,
+            )
+            if i == 0 and kind != "ev":
+                st.caption("Place this leg first: its price is furthest above the other books, so it's the likeliest to move.")
+            if checked is None:
+                st.caption("Re-check prices to unlock Open bet.")
+            elif link is None:
+                st.caption("This book sent no link. Open its app and find the game.")
+            else:
+                st.link_button("Open bet ↗", link.url, type="primary", width="stretch")
+            copy_button(stake)
+            got = price
+            if i == 0:
+                got = int(st.number_input(
+                    "Price you got", value=price, step=1, key=f"got_{key}_{prefix}",
+                    help="If the book gave you a different price, enter it to rebalance the next leg.",
+                ))
+                if -100 < got < 100:
+                    st.caption("Enter American odds of -100 or lower, or +100 or higher.")
+                    got = price
+                first_got = got
+            st.checkbox("Placed", key=f"placed_{key}_{prefix}")
+            if is_placed:
+                placed.append(service.PlacedLeg(row[f"{prefix}book"], bet, got, stake))
+
+    all_placed = len(placed) == len(prefixes)
+    shown = [service.PlacedLeg(row[f"{p}book"], "", price_of[p], stakes[p]) for p in prefixes]
+    legs_for_net = placed if all_placed else shown
+    worst, best = service.placed_nets(legs_for_net)
     if kind == "arb":
-        leg_card("Leg 1", row, "leg1_", row["r_stake1"])
-        leg_card("Leg 2", row, "leg2_", row["r_stake2"])
-        if row["goes_negative"]:
-            st.warning(
-                f"Rounding to {STAKE_STEPS[s.stake_step].lower()} turns this into a possible loss: "
-                f"net {fmt.money(row['worst_net'], signed=True)} to {fmt.money(row['best_net'], signed=True)}."
-            )
+        staked = fmt.money(sum(leg.stake for leg in legs_for_net))
+        msg = f"Net {fmt.money(worst, signed=True)} to {fmt.money(best, signed=True)} on {staked} staked"
+        if worst >= 0:
+            st.success(f"{msg}{' as placed' if all_placed else ''}.")
+        elif all_placed:
+            st.warning(f"{msg} as placed. The prices you got can lose money on one side.")
         else:
-            st.success(
-                f"Net {fmt.money(row['worst_net'], signed=True)} to {fmt.money(row['best_net'], signed=True)} "
-                f"on {fmt.money(row['r_stake1'] + row['r_stake2'])} staked."
-            )
-        st.caption(f"Exact split: {fmt.money(row['stake1'])} / {fmt.money(row['stake2'])} pays {fmt.money(row['payout'])} either way ({fmt.pct(row['profit_pct'])}).")
+            st.warning(f"{msg}. Rounding the stakes makes this a possible loss.")
     elif kind == "middle":
-        leg_card("Leg 1", row, "leg1_", row["stake1"])
-        leg_card("Leg 2", row, "leg2_", row["stake2"])
         miss = f"{fmt.money(row['miss_net'], signed=True)} (hold {fmt.pct(row['hold_pct'])})"
         if row["both_win"]:
             st.info(
@@ -464,16 +592,27 @@ def screen_detail() -> None:
                 f"on the whole-number line, which refunds one bet while the other wins: "
                 f"{fmt.money(row['push_net'], signed=True)}. Otherwise: {miss}."
             )
+        st.caption("Amounts above are from the scan at the original prices.")
     else:
-        leg_card("Bet", row, "", row["kelly_stake"] if pd.notna(row["kelly_stake"]) else None)
         ref = "Pinnacle's no-vig price" if row["reference"] == "pinnacle" else f"the median no-vig price of {int(row['n_books'])} other books"
         st.info(
             f"EV {fmt.pct(row['ev_pct'])}. Fair price is {fmt.american(row['fair_odds_am'])} "
             f"({row['fair_prob'] * 100:.1f}% to win), from {ref}."
         )
         st.caption(f"Stake shown is quarter-Kelly on a {fmt.money(s.bankroll)} bankroll.")
+
+    if len(placed) == len(prefixes):
+        logged: set[str] = st.session_state.setdefault("logged_bets", set())
+        if key not in logged:
+            try:
+                service.append_bet_log(BET_LOG, datetime.now(timezone.utc), kind, row["matchup"],
+                                       row["market"], placed, fair_prob=fair)
+                logged.add(key)
+            except OSError:
+                st.error("Couldn't write to .cache/bets.csv. Your bets are placed; note them down.")
+        if key in logged:
+            st.success("All placed. Logged to .cache/bets.csv.")
     st.caption(REALITY[kind])
-    st.caption("Open-bet links, copy-stake buttons and the price re-check arrive with the bet-link phase.")
 
 
 def screen_hedge() -> None:
@@ -551,11 +690,45 @@ def screen_settings() -> None:
     if resp is not None and resp.source != "fixture":
         q = resp.quota
         st.caption(f"API usage: {q.remaining} remaining · {q.used} used · last call {q.last}")
+    st.caption(f"Bet links use state: {bet_state().upper() or 'not set'} (BET_STATE in .env).")
+    if app_password():
+        st.caption("Password protection is on.")
+    elif not c["use_fixtures"]:
+        st.warning("No password is set. Anyone who can reach this app can spend your credits. "
+                   "Add APP_PASSWORD to .env.")
     with st.expander("What bet links can and can't do"):
         st.write(
             "A link can open the sportsbook with your selection on the slip. It can't fill in the "
             "stake or place the bet, and you need to be logged in and location-verified in the book's app."
         )
+
+
+def app_password() -> str:
+    """APP_PASSWORD from .env / environment, else Streamlit secrets. '' = no gate."""
+    value = os.environ.get("APP_PASSWORD", "").strip()
+    if value:
+        return value
+    try:
+        return str(st.secrets["APP_PASSWORD"]).strip()
+    except Exception:
+        return ""
+
+
+def password_gate() -> None:
+    """Stops the script until the right password is entered, when one is set."""
+    expected = app_password()
+    if not expected or st.session_state.get("authed"):
+        return
+    header(show_gear=False)
+    with st.form("login"):
+        entered = st.text_input("Password", type="password")
+        submitted = st.form_submit_button("Unlock", type="primary", width="stretch")
+    if submitted:
+        if service.check_password(entered, expected):
+            st.session_state["authed"] = True
+            st.rerun()
+        st.error("That password didn't match. Try again.")
+    st.stop()
 
 
 SCREENS = {
@@ -565,4 +738,5 @@ SCREENS = {
     "hedge": screen_hedge,
     "settings": screen_settings,
 }
+password_gate()
 SCREENS.get(st.session_state.get("screen", "home"), screen_home)()
