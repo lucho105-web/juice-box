@@ -13,7 +13,7 @@ Full spec: [docs/SPEC.md](docs/SPEC.md). Build rules: [CLAUDE.md](CLAUDE.md).
 | 0 | Scaffold | done |
 | 1 | Odds math + tests (`edge/odds_math.py`) | done |
 | 2 | API client + parser + fixture (`edge/api.py`, `edge/parse.py`) | done |
-| 3 | Scanners | not started |
+| 3 | Scanners: arbs, middles, +EV (`edge/scanners.py`) | done |
 | 4 | Streamlit UI | not started |
 | 5 | Live smoke test, mobile cards, bet links | not started |
 
