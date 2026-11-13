@@ -1,0 +1,73 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; background: transparent; font-family: "Source Sans Pro", system-ui, sans-serif; }
+  #row { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 8px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  #row::-webkit-scrollbar { display: none; }
+  .chip { flex: 0 0 72px; background: #1C1C1F; border: 2px solid #2C2C31; border-radius: 14px; padding: 9px 2px 7px;
+          color: #F4F4F5; font: 600 12px/1.25 inherit; font-family: inherit; text-align: center; cursor: pointer; }
+  .chip.on { border-color: #FF8A1F; background: #26201A; }
+  .chip.off { opacity: .4; cursor: default; }
+  .chip:focus-visible { outline: 2px solid #B6F36A; outline-offset: 1px; }
+  .logo { width: 34px; height: 34px; margin: 0 auto 5px; display: block; object-fit: contain; }
+  .fb { border-radius: 50%; background: #2C2C31; line-height: 34px; font-size: 11px; }
+  .sub { display: block; font-weight: 400; font-size: 10px; color: #A0A0A8; }
+</style>
+</head>
+<body>
+<div id="row" role="listbox" aria-label="Sport"></div>
+<script>
+  function send(type, data) {
+    window.parent.postMessage(Object.assign({ isStreamlitMessage: true, type: type }, data || {}), "*");
+  }
+  function fallback(label) {
+    const d = document.createElement("div");
+    d.className = "logo fb";
+    d.textContent = label.replace(/[^A-Za-z ]/g, "").split(" ").map(w => w[0]).join("").slice(0, 3).toUpperCase();
+    return d;
+  }
+  let lastSelected = null;
+  function render(args) {
+    const row = document.getElementById("row");
+    row.textContent = "";
+    (args.items || []).forEach(item => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip" + (item.key === args.selected ? " on" : "") + (item.active ? "" : " off");
+      b.setAttribute("role", "option");
+      b.setAttribute("aria-selected", item.key === args.selected ? "true" : "false");
+      if (item.logo) {
+        const img = document.createElement("img");
+        img.className = "logo"; img.alt = ""; img.src = item.logo;
+        img.onerror = () => img.replaceWith(fallback(item.label));
+        b.appendChild(img);
+      } else {
+        b.appendChild(fallback(item.label));
+      }
+      b.appendChild(document.createTextNode(item.label));
+      if (!item.active) {
+        const s = document.createElement("span");
+        s.className = "sub"; s.textContent = item.note || "Out of season";
+        b.appendChild(s);
+        b.disabled = true;
+      } else {
+        b.onclick = () => send("streamlit:setComponentValue", { value: item.key, dataType: "json" });
+      }
+      row.appendChild(b);
+    });
+    if (args.selected !== lastSelected) {
+      const on = row.querySelector(".chip.on");
+      if (on) on.scrollIntoView({ inline: "center", block: "nearest" });
+      lastSelected = args.selected;
+    }
+    send("streamlit:setFrameHeight", { height: document.body.scrollHeight });
+  }
+  window.addEventListener("message", e => {
+    if (e.data && e.data.type === "streamlit:render") render(e.data.args || {});
+  });
+  send("streamlit:componentReady", { apiVersion: 1 });
+</script>
+</body>
+</html>

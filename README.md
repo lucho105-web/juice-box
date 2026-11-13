@@ -17,6 +17,12 @@ Full spec: [docs/SPEC.md](docs/SPEC.md). Build rules: [CLAUDE.md](CLAUDE.md).
 | 4 | Streamlit UI: home, lists, bet detail, hedge, settings (`app.py`) | done |
 | 5 | Live smoke test (3 credits) | done |
 | 5b | Bet links, copy stake, price re-check, leg tracker, bet log, password gate | done |
+| 6 | Beginner redesign: league picker, team logos, sportsbook chips, Learn screen | done |
+
+Sports offered: NBA, NFL, NHL, College Football, College Basketball, Premier
+League, MLB. Team and league logos load from ESPN's image servers using
+`assets/teams.json`; rebuild it with `python tools/build_teams.py` when teams
+change. If logos stop loading, turn off "Show team and league logos" in Settings.
 
 ## Setup (PowerShell)
 

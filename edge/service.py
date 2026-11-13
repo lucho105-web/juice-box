@@ -40,6 +40,8 @@ class ScanSettings:
     max_age_s: float = DEFAULT_MAX_AGE_S
     include_live: bool = False
     use_pinnacle: bool = False
+    my_books: frozenset[str] | None = None   # None = every book; else only bet at these
+    hide_push_middles: bool = False
 
 
 @dataclass(frozen=True)
@@ -60,17 +62,31 @@ class ScanResults:
 def analyze(
     events: Sequence[Mapping[str, Any]], now: datetime, settings: ScanSettings
 ) -> ScanResults:
-    """Parse, filter stale / live lines, then run all three scanners."""
+    """Parse, filter stale / live lines, then run all three scanners.
+
+    With `my_books` set, arbs and middles only use those books. +EV still
+    compares against every book (they are the reference prices) but only
+    reports bets at the user's books.
+    """
     raw = parse_odds(events, now)
     offers = filter_offers(raw, settings.max_age_s, settings.include_live)
+    mine = offers
+    if settings.my_books is not None:
+        mine = offers[offers["book_key"].isin(settings.my_books)].reset_index(drop=True)
+    middles = find_middles(mine, settings.bankroll, settings.min_hold_pct, settings.min_window)
+    if settings.hide_push_middles:
+        middles = middles[middles["both_win"].astype(bool)].reset_index(drop=True)
+    evs = find_ev(
+        offers, settings.min_ev_pct, settings.min_books, settings.use_pinnacle, settings.bankroll
+    )
+    if settings.my_books is not None:
+        evs = evs[evs["book_key"].isin(settings.my_books)].reset_index(drop=True)
     return ScanResults(
         n_raw=len(raw),
         n_fresh=len(offers),
-        arbs=find_arbs(offers, settings.bankroll, settings.min_arb_pct, settings.stake_step),
-        middles=find_middles(offers, settings.bankroll, settings.min_hold_pct, settings.min_window),
-        evs=find_ev(
-            offers, settings.min_ev_pct, settings.min_books, settings.use_pinnacle, settings.bankroll
-        ),
+        arbs=find_arbs(mine, settings.bankroll, settings.min_arb_pct, settings.stake_step),
+        middles=middles,
+        evs=evs,
     )
 
 
