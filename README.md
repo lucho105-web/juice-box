@@ -19,6 +19,18 @@ Full spec: [docs/SPEC.md](docs/SPEC.md). Build rules: [CLAUDE.md](CLAUDE.md).
 | 5b | Bet links, copy stake, price re-check, leg tracker, bet log, password gate | done |
 | 6 | Beginner redesign: league picker, team logos, sportsbook chips, Learn screen | done |
 
+## Wanted next
+
+Not started. Each needs a short design pass before building.
+
+1. **Track my bets and overall performance.** Today a placed bet is only appended
+   to `.cache/bets.csv`; nothing records how it settled. Wanted: mark each bet
+   won / lost / pushed, and show overall results (profit, ROI, by book and by
+   bet type).
+2. **Find promos and rewards I can use for an edge.** Sportsbook promos (bonus
+   bets, profit boosts, deposit matches, rewards). The Odds API has no promo
+   data, so the source of promos is an open question.
+
 Sports offered: NBA, NFL, NHL, College Football, College Basketball, Premier
 League, MLB. Team and league logos load from ESPN's image servers using
 `assets/teams.json`; rebuild it with `python tools/build_teams.py` when teams
